@@ -91,7 +91,7 @@ find $RPM_BUILD_ROOT%{_libdir} -name *.so -exec chmod 755 {} \;
 # noidea
 %{__rm} -r $RPM_BUILD_ROOT%{_datadir}/locale/en_US@piglatin
 
-%find_lang %{name}
+#%find_lang %{name}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -99,7 +99,7 @@ rm -rf $RPM_BUILD_ROOT
 %post	-p /sbin/ldconfig
 %postun	-p /sbin/ldconfig
 
-%files -f %{name}.lang
+%files
 %defattr(644,root,root,755)
 %dir /etc/xdg/libdesktop-agnostic
 %config(noreplace) /etc/xdg/libdesktop-agnostic/desktop-agnostic.ini
@@ -132,6 +132,11 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %dir %{py_sitedir}/desktopagnostic
 %{py_sitedir}/desktopagnostic/*.py[co]
+%attr(755,root,root) %{py_sitedir}/desktopagnostic/config.so
+%attr(755,root,root) %{py_sitedir}/desktopagnostic/desktopagnostic.so
+%attr(755,root,root) %{py_sitedir}/desktopagnostic/fdo.so
+%attr(755,root,root) %{py_sitedir}/desktopagnostic/ui.so
+%attr(755,root,root) %{py_sitedir}/desktopagnostic/vfs.so
 
 %files devel
 %defattr(644,root,root,755)
