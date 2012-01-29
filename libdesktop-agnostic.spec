@@ -6,6 +6,7 @@ License:	GPL v2+ and LGPL v2+
 Group:		Libraries
 URL:		https://launchpad.net/libdesktop-agnostic
 Source0:	http://launchpad.net/libdesktop-agnostic/0.4/%{version}/+download/%{name}-%{version}.tar.gz
+# Source0-md5:	42374d226a21d57637f97173f6b105a1
 Patch0:		gladeui.patch
 BuildRequires:	GConf2-devel
 BuildRequires:	gettext
