@@ -1,0 +1,14 @@
+--- a/data/wscript	2011-03-12 15:14:23.000000000 +0100
++++ b/data/wscript	2011-05-28 18:25:23.897854907 +0200
+@@ -16,9 +16,9 @@
+ def configure(conf):
+     conf.env['GLADE_SUPPORT'] = Options.options.glade
+     if conf.env['GLADE_SUPPORT']:
+-        conf.check_cfg(package='gladeui-1.0', uselib_store='GLADEUI',
++        conf.check_cfg(package='gladeui-2.0', uselib_store='GLADEUI',
+                        mandatory=True, args='--cflags --libs')
+-        pkgconfig = 'pkg-config --variable catalogdir gladeui-1.0'
++        pkgconfig = 'pkg-config --variable catalogdir gladeui-2.0'
+         conf.env['GLADEUI_CATALOGDIR'] = \
+                 Utils.cmd_output(pkgconfig, silent=1).strip()
+ 
