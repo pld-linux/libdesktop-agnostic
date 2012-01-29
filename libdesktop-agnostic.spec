@@ -1,7 +1,7 @@
 Summary:	Provides an extensible configuration API
 Name:		libdesktop-agnostic
 Version:	0.3.92
-Release:	1
+Release:	2
 License:	GPL v2+ and LGPL v2+
 Group:		Libraries
 URL:		https://launchpad.net/libdesktop-agnostic
@@ -59,7 +59,7 @@ developing applications that use %{name}.
 %patch0 -p1
 
 %build
-export CFLAGS="%{rpmfcflags}"
+export CFLAGS="%{rpmcflags}"
 PYTHONDIR=%{py_sitedir} ./waf configure \
 	  --prefix=%{_prefix} \
 	  --libdir=%{_libdir} \
