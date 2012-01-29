@@ -1,7 +1,7 @@
 Summary:	Provides an extensible configuration API
 Name:		libdesktop-agnostic
 Version:	0.3.92
-Release:	3
+Release:	4
 License:	GPL v2+ and LGPL v2+
 Group:		Libraries
 URL:		https://launchpad.net/libdesktop-agnostic
@@ -91,7 +91,7 @@ find $RPM_BUILD_ROOT%{_libdir} -name *.so -exec chmod 755 {} \;
 # noidea
 %{__rm} -r $RPM_BUILD_ROOT%{_datadir}/locale/en_US@piglatin
 
-#%find_lang %{name}
+#%%find_lang %{name}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
