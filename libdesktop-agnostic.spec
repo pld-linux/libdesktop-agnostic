@@ -1,7 +1,7 @@
 Summary:	Provides an extensible configuration API
 Name:		libdesktop-agnostic
 Version:	0.3.92
-Release:	2
+Release:	3
 License:	GPL v2+ and LGPL v2+
 Group:		Libraries
 URL:		https://launchpad.net/libdesktop-agnostic
@@ -10,7 +10,6 @@ Source0:	http://launchpad.net/libdesktop-agnostic/0.4/%{version}/+download/%{nam
 Patch0:		gladeui.patch
 BuildRequires:	GConf2-devel
 BuildRequires:	gettext
-BuildRequires:	rpmbuild(macros) >= 1.219
 BuildRequires:	glade-devel >= 3
 BuildRequires:	gnome-desktop-devel
 BuildRequires:	gobject-introspection-devel
@@ -18,6 +17,7 @@ BuildRequires:	gtk+-devel
 BuildRequires:	intltool
 BuildRequires:	python-devel
 BuildRequires:	python-pygtk-devel
+BuildRequires:	rpmbuild(macros) >= 1.219
 BuildRequires:	vala
 #BuildRequires:  waf
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
@@ -87,6 +87,9 @@ DESTDIR=$RPM_BUILD_ROOT ./waf install
 
 # fix permissions so debuginfo is stripped from .so files
 find $RPM_BUILD_ROOT%{_libdir} -name *.so -exec chmod 755 {} \;
+
+# noidea
+%{__rm} -r $RPM_BUILD_ROOT%{_datadir}/locale/en_US@piglatin
 
 %find_lang %{name}
 
