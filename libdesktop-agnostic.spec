@@ -1,7 +1,7 @@
 Summary:	Provides an extensible configuration API
 Name:		libdesktop-agnostic
 Version:	0.3.92
-Release:	4
+Release:	5
 License:	GPL v2+ and LGPL v2+
 Group:		Libraries
 URL:		https://launchpad.net/libdesktop-agnostic
@@ -43,11 +43,11 @@ Requires:	%{name} = %{version}-%{release}
 %description -n python-desktop-agnostic
 This package contains the Python bindings for the core library.
 
-
 %package devel
 Summary:	Development files for %{name}
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
+Requires:	%{name}-progs = %{version}-%{release}
 
 %description devel
 The %{name}-devel package contains libraries and header files for
