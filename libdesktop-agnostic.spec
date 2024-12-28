@@ -6,7 +6,7 @@ Summary:	Provides an extensible configuration API
 Summary(pl.UTF-8):	Rozszerzalne API konfiguracyjne
 Name:		libdesktop-agnostic
 Version:	0.3.92
-Release:	6
+Release:	7
 License:	GPL v2+ and LGPL v2+
 Group:		Libraries
 Source0:	https://launchpad.net/libdesktop-agnostic/0.4/%{version}/+download/%{name}-%{version}.tar.gz
