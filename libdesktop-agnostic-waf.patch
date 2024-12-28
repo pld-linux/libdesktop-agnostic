@@ -1,0 +1,514 @@
+--- libdesktop-agnostic-0.3.92/data/wscript.orig	2024-12-23 11:22:38.613314242 +0100
++++ libdesktop-agnostic-0.3.92/data/wscript	2024-12-23 11:22:38.613314242 +0100
+@@ -1,12 +1,10 @@
+ #!/usr/bin/env python
+ # encoding: utf-8
+ 
+-import Options
+-import Utils
+-import misc
++from waflib import Options
+ 
+ 
+-def set_options(opt):
++def options(opt):
+     opt.add_option('--with-glade', action='store_true',
+                    dest='glade', default=False,
+                    help='Installs the Glade catalog for the ' \
+@@ -17,14 +15,13 @@ def configure(conf):
+     conf.env['GLADE_SUPPORT'] = Options.options.glade
+     if conf.env['GLADE_SUPPORT']:
+         conf.check_cfg(package='gladeui-2.0', uselib_store='GLADEUI',
+-                       mandatory=True, args='--cflags --libs')
+-        pkgconfig = 'pkg-config --variable catalogdir gladeui-2.0'
+-        conf.env['GLADEUI_CATALOGDIR'] = \
+-                Utils.cmd_output(pkgconfig, silent=1).strip()
++                       variables=['catalogdir'],
++                       mandatory=True)
++        conf.env['GLADEUI_CATALOGDIR'] = conf.env.GLADEUI_catalogdir
+ 
+ 
+ def build(bld):
+-    pc = bld.new_task_gen('subst')
++    pc = bld(features='subst')
+     pc.source = 'desktop-agnostic.pc.in'
+     pc.target = 'desktop-agnostic.pc'
+     pc.dict = {
+@@ -34,10 +31,9 @@ def build(bld):
+         'prefix': bld.env['PREFIX'],
+         'datarootdir': bld.env['DATADIR'],
+         }
+-    pc.fun = misc.subst_func
+     pc.install_path = '${LIBDIR}/pkgconfig'
+ 
+-    ini = bld.new_task_gen('subst')
++    ini = bld(features='subst')
+     ini.source = 'desktop-agnostic.ini.in'
+     ini.target = 'desktop-agnostic.ini'
+     ini.dict = {
+@@ -45,7 +41,6 @@ def build(bld):
+         'VFS_BACKEND': bld.env['BACKENDS_VFS'][0],
+         'DESKTOP_ENTRY_BACKEND': bld.env['BACKENDS_DE'][0],
+     }
+-    ini.fun = misc.subst_func
+     ini.install_path = '${SYSCONFDIR}/xdg/libdesktop-agnostic'
+ 
+     if bld.env['GLADE_SUPPORT']:
+--- libdesktop-agnostic-0.3.92/docs/wscript.orig	2011-03-12 15:14:23.000000000 +0100
++++ libdesktop-agnostic-0.3.92/docs/wscript	2024-12-23 11:22:38.613314242 +0100
+@@ -2,10 +2,10 @@
+ # encoding: utf-8
+ # vim: set ts=4 sts=4 sw=4 et :
+ 
+-import Options
++from waflib import Options
+ 
+ 
+-def set_options(opt):
++def options(opt):
+     opt.add_option('--enable-docs', action='store_true',
+                    dest='docs', default=False,
+                    help='Enables support for building the documentation '
+--- libdesktop-agnostic-0.3.92/libdesktop-agnostic/wscript.orig	2011-03-12 15:14:23.000000000 +0100
++++ libdesktop-agnostic-0.3.92/libdesktop-agnostic/wscript	2024-12-28 12:51:02.730901167 +0100
+@@ -1,8 +1,8 @@
+ #! /usr/bin/env python
+ # encoding: utf-8
+ 
+-import Task
+-from TaskGen import feature, taskgen
++from waflib import Task
++from waflib.TaskGen import feature, taskgen_method
+ import os
+ 
+ deps = {
+@@ -19,6 +19,11 @@ deps = {
+             'packages_private': 'config-notify-delegate',
+         }
+     },
++    'cfg-type': {
++        'color': {
++            'uselib': 'GDK',
++        }
++    },
+     'vfs': {
+         'gio': {
+             'uselib': 'GIO',
+@@ -46,13 +51,13 @@ deps = {
+ }
+ 
+ 
+-@taskgen
+-@feature('cc')
++@taskgen_method
++@feature('c')
+ def generate_typelib(self):
+     if hasattr(self, 'gir'):
+         node = self.path.find_resource('%s.gir' % self.gir)
+         if not node:
+-            print "Not a valid GIR file!"
++            print("Not a valid GIR file!")
+             return
+         task = self.create_task('typelib')
+         bld = task.generator.bld
+@@ -69,14 +74,14 @@ def generate_typelib(self):
+ def create_typelib_task():
+     rule = 'LD_LIBRARY_PATH="${CURRENT_BUILD_DIR}" ${G_IR_COMPILER} ' + \
+            '-o ${TGT} ${SRC}'
+-    Task.simple_task_type('typelib', rule, after='cc_link')
++    Task.task_factory('typelib', rule, after='link_task')
+ 
+ create_typelib_task()
+ 
+ 
+ def task_module(type_name, src_prefix):
+     def build_module(bld, name):
+-        module = bld.new_task_gen('cc', 'shlib')
++        module = bld(features='c cshlib')
+         module.source = ' '.join(['%s-%s.vala' % (prefix, name)
+                                   for prefix in src_prefix.split()])
+         if type_name in deps and name in deps[type_name]:
+@@ -85,17 +90,18 @@ def task_module(type_name, src_prefix):
+             module.packages_private = deps[type_name][name] \
+                                       .get('packages_private', '')
+         ftype, sep, tail = type_name.partition('-')
+-        module.uselib_local = 'desktop-agnostic-%s' % ftype
++        module.use = 'desktop-agnostic-%s' % ftype
+         module.target = 'da-%s-%s' % (type_name, name)
+         module.vapi_dirs = '../vapi'
+-        module.includes = '..'
++        module.includes = '.. ../libdesktop-agnostic'
++        module.install_binding = False
+         module.install_path = None
+         bld.install_files('${LIBDIR}/desktop-agnostic/modules',
+-                          bld.env['shlib_PATTERN'] % module.target)
++                          bld.env['cshlib_PATTERN'] % module.target)
+     return build_module
+ 
+ 
+-def set_options(opt):
++def options(opt):
+     opt.add_option('--config-backends', type='string',
+                    help='Determines which configuration backend(s) will be ' \
+                         'built.',
+@@ -110,7 +116,7 @@ def set_options(opt):
+ 
+ 
+ def build(bld):
+-    lib = bld.new_task_gen('cc', 'shlib')
++    lib = bld(features='c cshlib')
+     lib.source = ' '.join([
+         'color.vala',
+         'module.vala',
+@@ -125,7 +131,7 @@ def build(bld):
+     lib.vapi_dirs = '../vapi'
+     lib.vnum = bld.env['VNUM']
+ 
+-    vfs = bld.new_task_gen('cc', 'shlib')
++    vfs = bld(features='c cshlib')
+     vfs.source = ' '.join([
+         'vfs.vala',
+         'vfs-bookmarks-gtk.vala',
+@@ -140,13 +146,14 @@ def build(bld):
+     vfs.header = 'vfs'
+     if bld.env['INTROSPECTION']:
+         vfs.gir = 'DesktopAgnosticVFS-1.0'
+-    vfs.uselib_local = 'desktop-agnostic'
++    vfs.use = 'desktop-agnostic'
++    vfs.uselib = 'GDK'
+     vfs.packages_private = 'posix-glob'
+     vfs.includes = '..'
+     vfs.vapi_dirs = '../vapi .'
+     vfs.vnum = bld.env['VNUM']
+ 
+-    cfg = bld.new_task_gen('cc', 'shlib')
++    cfg = bld(features='c cshlib')
+     cfg.source = ' '.join([
+         'config.vala',
+         'config-bridge.vala',
+@@ -160,13 +167,14 @@ def build(bld):
+     cfg.header = 'config'
+     if bld.env['INTROSPECTION']:
+         cfg.gir = 'DesktopAgnosticConfig-1.0'
+-    cfg.uselib_local = 'desktop-agnostic-vfs'
++    cfg.use = 'desktop-agnostic-vfs'
++    cfg.uselib = 'GDK'
+     cfg.packages_private = 'hashtable-gtype-key'
+-    cfg.includes = '..'
++    cfg.includes = '.. ../libdesktop-agnostic'
+     cfg.vapi_dirs = '../vapi .'
+     cfg.vnum = bld.env['VNUM']
+ 
+-    fdo = bld.new_task_gen('cc', 'shlib')
++    fdo = bld(features='c cshlib')
+     fdo.source = ' '.join([
+         'desktop-entry.vala',
+         ])
+@@ -175,12 +183,13 @@ def build(bld):
+     fdo.header = 'fdo'
+     if bld.env['INTROSPECTION']:
+         fdo.gir = 'DesktopAgnosticFDO-1.0'
+-    fdo.uselib_local = 'desktop-agnostic-vfs'
++    fdo.use = 'desktop-agnostic-vfs'
++    fdo.uselib = 'GDK'
+     fdo.vapi_dirs = '.'
+     fdo.includes = '..'
+     fdo.vnum = bld.env['VNUM']
+ 
+-    ui = bld.new_task_gen('cc', 'shlib')
++    ui = bld(features='c cshlib')
+     ui.source = ' '.join([
+         'ui-color-button.vala',
+         'ui-icon-button.vala',
+@@ -194,7 +203,7 @@ def build(bld):
+     if bld.env['INTROSPECTION']:
+         ui.gir = 'DesktopAgnosticUI-1.0'
+     ui.uselib = 'GTK'
+-    ui.uselib_local = 'desktop-agnostic-fdo'
++    ui.use = 'desktop-agnostic-fdo'
+     ui.vapi_dirs = '. ../vapi'
+     ui.includes = '..'
+     ui.vnum = bld.env['VNUM']
+@@ -210,12 +219,14 @@ def build(bld):
+     [task_module('fdo', 'desktop-entry-impl')(bld, name)
+      for name in bld.env['BACKENDS_DE']]
+ 
+-    mod_guess = bld.new_task_gen('cc', 'shlib')
++    mod_guess = bld(features='c cshlib')
+     mod_guess.source = 'module-guesser.vala'
+-    mod_guess.uselib_local = 'desktop-agnostic-vfs'
++    mod_guess.use = 'desktop-agnostic-vfs'
++    mod_guess.uselib = 'GTK'
+     mod_guess.target = 'da-module-guesser'
+     mod_guess.vapi_dirs = '../vapi'
+     mod_guess.includes = '..'
++    mod_guess.install_binding = False
+     mod_guess.install_path = None
+     bld.install_files('${LIBDIR}/desktop-agnostic/modules',
+-                      bld.env['shlib_PATTERN'] % mod_guess.target)
++                      bld.env['cshlib_PATTERN'] % mod_guess.target)
+--- libdesktop-agnostic-0.3.92/po/wscript.orig	2011-03-12 15:14:23.000000000 +0100
++++ libdesktop-agnostic-0.3.92/po/wscript	2024-12-23 11:22:38.613314242 +0100
+@@ -3,4 +3,4 @@
+ 
+ 
+ def build(bld):
+-    bld.new_task_gen(features='intltool_po', appname='libdesktop-agnostic')
++    bld(features='intltool_po', appname='libdesktop-agnostic')
+--- libdesktop-agnostic-0.3.92/python/wscript.orig	2011-03-12 15:14:23.000000000 +0100
++++ libdesktop-agnostic-0.3.92/python/wscript	2024-12-27 16:40:24.123254470 +0100
+@@ -4,10 +4,8 @@
+ # PyGObject bindings generator (until the gi module is stable)
+ # copied/modified from gnome-python-desktop
+ 
+-import Task
+-from TaskGen import extension
+-import Utils
+-import misc
++from waflib import Task
++from waflib.TaskGen import extension
+ import os
+ import types
+ 
+@@ -23,21 +21,21 @@ def configure(conf):
+         if not conf.find_program('pygtk-codegen-2.0', var='CODEGEN'):
+             conf.fatal('Could not find the PyGObject/PyGTK code generator ' \
+                        'script')
+-    pkgconfig = 'pkg-config --variable defsdir pygtk-2.0'
+-    conf.env['PYGTK_DEFSDIR'] = Utils.cmd_output(pkgconfig, silent=1).strip()
++    conf.check_cfg(package='pygtk-2.0', variables=['defsdir'], uselib_store='PYGTK')
++    conf.env['PYGTK_DEFSDIR'] = conf.env.PYGTK_defsdir
+     conf.check_cfg(package='pygobject-2.0', uselib_store='PYGLIB',
+                    atleast_version='2.15.2')
+ 
+ 
+ def run_pyg_codegen(self):
+     # stolen from TaskGen.exec_rule
+-    func, func_vars = Task.compile_fun('', self.generator.rule,
++    func, func_vars = Task.compile_fun(self.generator.rule,
+                                        shell=getattr(self.generator, 'shell',
+                                                      True))
+     func.code = self.generator.rule
+     func(self)
+ 
+-Task.task_type_from_func('pyg_codegen', run_pyg_codegen, ext_out='.c')
++Task.task_factory('pyg_codegen', run_pyg_codegen, ext_out='.c')
+ 
+ 
+ @extension('.defs')
+@@ -53,10 +51,10 @@ def defs_hook(self, node):
+     for load in getattr(self, 'local_load_types', ()):
+         sources += [node.parent.find_resource(load)]
+         rule += ['--load-types',
+-                 '${SRC[%i].abspath(env)}' % (len(sources) - 1)]
++                 '${SRC[%i].abspath()}' % (len(sources) - 1)]
+     for reg in getattr(self, 'local_register', ()):
+         sources += [node.parent.find_resource(reg)]
+-        rule += ['--register', '${SRC[%i].abspath(env)}' % (len(sources) - 1)]
++        rule += ['--register', '${SRC[%i].abspath()}' % (len(sources) - 1)]
+     for reg in getattr(self, 'register', ()):
+         rule += ['--register', reg]
+     if hasattr(self, 'prefix'):
+@@ -72,11 +70,11 @@ def defs_hook(self, node):
+     task.inputs = sources
+     task.outputs = [c_node]
+ 
+-    self.allnodes.append(c_node)
++    # self.allnodes.append(c_node)
+ 
+ 
+ def pyg_module(bld, module, dependencies, prefix=None, local_register=None):
+-    pyext = bld.new_task_gen('cc', 'shlib', 'pyext')
++    pyext = bld(features='c cshlib pyext')
+     pyext.source = '%s.defs %smodule.c' % (module, module)
+     pyext.target = module
+     if prefix is not None:
+@@ -115,13 +113,12 @@ def build(bld):
+         pyext = bld.pyg_module(module, 'desktop-agnostic-%s' % dep,
+                                'pydesktopagnostic_%s' % module, lr)
+ 
+-    init = bld.new_task_gen('subst')
++    init = bld(features='subst')
+     init.source = '__init__.py.in'
+     init.target = '__init__.py'
+     init.dict = {
+         'VERSION': bld.env['VERSION'],
+     }
+-    init.fun = misc.subst_func
+     init.install_path = '${PYTHONDIR}/desktopagnostic'
+ 
+ # vim: set ts=4 sts=4 sw=4 et :
+--- libdesktop-agnostic-0.3.92/tests/wscript.orig	2011-03-12 15:14:23.000000000 +0100
++++ libdesktop-agnostic-0.3.92/tests/wscript	2024-12-27 16:47:56.951346123 +0100
+@@ -1,19 +1,21 @@
+ #!/usr/bin/python
+ # encoding: utf-8
+ 
+-NEEDS_GDK = ['test-desktop-entry', 'test-vfs-file']
++NEEDS_GDK = ['test-desktop-entry', 'test-vfs-file', 'test-color']
+ 
+ 
+-def build_test_program(bld, name, suffix):
+-    test = bld.new_task_gen('cc', 'program')
++def build_test_program(bld, name, suffix, uselib=''):
++    test = bld(features='c')
+     test.source = name + '.vala'
++    test.uselib = uselib
++    test.install_binding = False
+     if name in NEEDS_GDK:
+         test.packages = 'gdk-2.0'
+-        test.uselib = 'GDK'
++        test.uselib += ' GDK'
+     if suffix == '':
+-        test.uselib_local = 'desktop-agnostic'
++        test.use = 'desktop-agnostic'
+     else:
+-        test.uselib_local = 'desktop-agnostic-%s' % suffix
++        test.use = 'desktop-agnostic-%s' % suffix
+     test.vapi_dirs = '../libdesktop-agnostic'
+     test.includes = '..'
+     test.target = name
+@@ -28,5 +30,5 @@ def build(bld):
+     [build_test_program(bld, 'test-' + name, 'vfs')
+      for name in ['vfs-bookmarks-gtk', 'vfs-file', 'vfs-file-monitor',
+                   'vfs-glob', 'vfs-trash', 'vfs-volume']]
+-    [build_test_program(bld, 'test-' + name, 'ui')
++    [build_test_program(bld, 'test-' + name, 'ui', uselib='GTK')
+      for name in ['ui-color-button', 'ui-color-button-gtkbuilder']]
+--- libdesktop-agnostic-0.3.92/tools/wscript.orig	2011-03-12 15:14:23.000000000 +0100
++++ libdesktop-agnostic-0.3.92/tools/wscript	2024-12-27 16:49:12.047235958 +0100
+@@ -4,15 +4,19 @@
+ 
+ def build(bld):
+     if 'gconf' in bld.env['BACKENDS_CFG']:
+-        schema = bld.new_task_gen('cc', 'program')
++        schema = bld(features='c cprogram')
+         schema.source = 'lda-schema-to-gconf.vala'
+-        schema.uselib_local = 'desktop-agnostic-cfg'
++        schema.use = 'desktop-agnostic-cfg'
++        schema.uselib = 'GDK'
+         schema.vapi_dirs = '../libdesktop-agnostic'
++        schema.includes = '..'
+         schema.target = 'lda-schema-to-gconf'
+-    launcher = bld.new_task_gen('cc', 'program')
++    launcher = bld(features='c cprogram')
+     launcher.source = 'lda-desktop-entry-editor.vala'
+     launcher.packages = 'desktop-agnostic-ui'
+     launcher.packages_private = 'build'
+-    launcher.uselib_local = 'desktop-agnostic-ui'
++    launcher.use = 'desktop-agnostic-ui'
++    launcher.uselib = 'GTK'
+     launcher.vapi_dirs = '../libdesktop-agnostic ../vapi'
++    launcher.includes = '..'
+     launcher.target = 'lda-desktop-entry-editor'
+--- libdesktop-agnostic-0.3.92/wscript.orig	2011-03-13 16:09:47.000000000 +0100
++++ libdesktop-agnostic-0.3.92/wscript	2024-12-23 11:22:38.616647557 +0100
+@@ -1,16 +1,12 @@
+ #! /usr/bin/env python
+ # encoding: utf-8
+ 
+-import intltool
+-import Options
+ import os
+-import Scripting
+ import shutil
+ import sys
+-import Utils
+ import tarfile
+-import Task
+ import tempfile
++from waflib import Context, Options, Scripting, Task, Utils
+ 
+ API_VERSION = '1.0'
+ 
+@@ -56,10 +52,10 @@ blddir = 'build'
+ config_backend = None
+ 
+ 
+-def set_options(opt):
+-    [opt.tool_options(x) for x in ['compiler_cc', 'gnu_dirs']]
+-    opt.sub_options('data docs')
+-    opt.sub_options('libdesktop-agnostic')
++def options(opt):
++    [opt.load(x) for x in ['compiler_c', 'gnu_dirs']]
++    opt.recurse('data docs')
++    opt.recurse('libdesktop-agnostic')
+     opt.add_option('--enable-debug', action='store_true',
+                    dest='debug', default=False,
+                    help='Enables the library to be built with debug symbols.')
+@@ -75,7 +71,7 @@ def set_options(opt):
+ 
+ 
+ def configure(conf):
+-    print 'Configuring %s %s' % (APPNAME, VERSION)
++    print ('Configuring %s %s' % (APPNAME, VERSION))
+ 
+     if len(Options.options.config_backends) == 0:
+         conf.fatal('At least one configuration backend needs to be built.')
+@@ -93,8 +89,8 @@ def configure(conf):
+     conf.env['INTROSPECTION'] = not Options.options.no_gi
+     conf.env['VNUM'] = str(VNUM)
+ 
+-    conf.check_tool('gnu_dirs')
+-    conf.check_tool('compiler_cc intltool misc python vala')
++    conf.load('gnu_dirs')
++    conf.load('compiler_c intltool python vala')
+ 
+     MIN_VALA_VERSION = (0, 10, 0)
+ 
+@@ -152,16 +148,17 @@ version %d.%d.%d''' % ((str(conf.env['VA
+     # check for gobject-introspection
+     conf.check_cfg(package='gobject-introspection-1.0',
+                    atleast_version='0.6.3', mandatory=True,
++                   variables=['g_ir_compiler'], uselib_store='GI',
+                    args='--cflags --libs')
+     pkgconfig = 'pkg-config --variable g_ir_compiler ' \
+                 'gobject-introspection-1.0'
+-    conf.env['G_IR_COMPILER'] = Utils.cmd_output(pkgconfig, silent=1).strip()
++    conf.env['G_IR_COMPILER'] = conf.env.GI_g_r_compiler
+ 
+-    conf.sub_config('data')
+-    conf.sub_config('docs')
++    conf.recurse('data')
++    conf.recurse('docs')
+ 
+     # manual Python bindings
+-    conf.sub_config('python')
++    conf.recurse('python')
+ 
+     conf.define('API_VERSION', str(API_VERSION))
+     conf.define('VERSION', str(VERSION))
+@@ -189,12 +186,12 @@ version %d.%d.%d''' % ((str(conf.env['VA
+ 
+ def build(bld):
+     # process subfolders from here
+-    bld.add_subdirs('libdesktop-agnostic tools tests data python docs')
++    bld.recurse('libdesktop-agnostic tools tests data python docs')
+ 
+     if bld.env['INTLTOOL']:
+-        bld.add_subdirs('po')
++        bld.recurse('po')
+ 
+-    cls = Task.TaskBase.classes['valac']
++    cls = Task.classes['valac']
+     old = cls.run
+ 
+     def run(self):
+@@ -207,7 +204,7 @@ def build(bld):
+             d = bld.path.abspath()
+             latest_input = 0
+             for x in self.inputs:
+-                timestamp = os.path.getmtime(x.abspath(self.env))
++                timestamp = os.path.getmtime(x.abspath())
+                 if timestamp > latest_input:
+                     latest_input = timestamp
+             # we need two passes to check that we have up-to-date C sources
+@@ -224,7 +221,7 @@ def build(bld):
+             for x in self.outputs:
+                 subdir = x.parent.path_to_parent(x.__class__.bld.srcnode)
+                 src = os.path.join(d, GEN_SRC_DIR, subdir, x.name)
+-                shutil.copy2(src, x.abspath(self.env))
++                shutil.copy2(src, x.abspath())
+             return 0
+     cls.run = run
+ 
