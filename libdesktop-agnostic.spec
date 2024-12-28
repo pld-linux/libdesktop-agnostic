@@ -61,6 +61,8 @@ Summary(pl.UTF-8):	Pliki programistyczne biblioteki libdesktop-agnostic
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
 Requires:	%{name}-progs = %{version}-%{release}
+Requires:	glib2-devel >= 1:2.18.0
+Requires:	gtk+2-devel >= 2:2.12.0
 
 %description devel
 This package contains the header files for developing applications
@@ -70,17 +72,58 @@ that use libdesktop-agnostic library.
 Ten pakiet zawiera pliki nagłówkowe do tworzenia aplikacji
 wykorzystujących bibliotekę libdesktop-agnostic.
 
+%package glade
+Summary:	Glade catalog file for libdesktop-agnostic library
+Summary(pl.UTF-8):	Plik katalogu Glade dla biblioteki libdesktop-agnostic
+Group:		Development/Libraries
+Requires:	%{name}-devel = %{version}-%{release}
+
+%description glade
+Glade catalog file for libdesktop-agnostic library.
+
+%description glade -l pl.UTF-8
+Plik katalogu Glade dla biblioteki libdesktop-agnostic.
+
+%package -n vala-libdesktop-agnostic
+Summary:	Vala API for libdesktop-agnostic library
+Summary(pl.UTF-8):	API języka Vala do biblioteki libdesktop-agnostic
+Group:		Development/Libraries
+Requires:	%{name}-devel = %{version}-%{release}
+Requires:	vala >= 0.10
+
+%description -n vala-libdesktop-agnostic
+Vala API for libdesktop-agnostic library.
+
+%description -n vala-libdesktop-agnostic -l pl.UTF-8
+API języka Vala do biblioteki libdesktop-agnostic.
+
 %package -n python-desktop-agnostic
 Summary:	Python bindings for libdesktop-agnostic
 Summary(pl.UTF-8):	Wiązania Pythona do biblioteki libdesktop-agnostic
-Group:		Development/Languages
+Group:		Libraries/Python
 Requires:	%{name} = %{version}-%{release}
+Requires:	python-modules >= 1:2.5
 
 %description -n python-desktop-agnostic
 This package contains the Python bindings for the core library.
 
 %description -n python-desktop-agnostic -l pl.UTF-8
 Ten pakiet zawiera wiązania Pythona do głównej biblioteki.
+
+%package -n python-desktop-agnostic-devel
+Summary:	Development files for libdesktop-agnostic Python bindings
+Summary(pl.UTF-8):	Pliki programistyczne wiązan Pythona do biblioteki libdesktop-agnostic
+Group:		Development/Libraries
+Requires:	python-desktop-agnostic = %{version}-%{release}
+Requires:	python-devel >= 1:2.5
+Requires:	python-pygtk-devel >= 2:2.12.0
+
+%description -n python-desktop-agnostic-devel
+Development files for libdesktop-agnostic Python bindings.
+
+%description -n python-desktop-agnostic-devel -l pl.UTF-8
+Pliki programistyczne wiązan Pythona do biblioteki
+libdesktop-agnostic.
 
 %prep
 %setup -q
@@ -169,9 +212,23 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/libdesktop-agnostic.so
 %{_includedir}/libdesktop-agnostic-1.0
 %{_pkgconfigdir}/desktop-agnostic.pc
-%{_datadir}/pygtk/2.0/defs/desktopagnostic*defs
-%{_datadir}/vala/vapi/desktop-agnostic*
+
+%files glade
+%defattr(644,root,root,755)
 %{_datadir}/glade/catalogs/desktop-agnostic.xml
+
+%files -n vala-libdesktop-agnostic
+%defattr(644,root,root,755)
+%{_datadir}/vala/vapi/desktop-agnostic.deps
+%{_datadir}/vala/vapi/desktop-agnostic.vapi
+%{_datadir}/vala/vapi/desktop-agnostic-cfg.deps
+%{_datadir}/vala/vapi/desktop-agnostic-cfg.vapi
+%{_datadir}/vala/vapi/desktop-agnostic-fdo.deps
+%{_datadir}/vala/vapi/desktop-agnostic-fdo.vapi
+%{_datadir}/vala/vapi/desktop-agnostic-ui.deps
+%{_datadir}/vala/vapi/desktop-agnostic-ui.vapi
+%{_datadir}/vala/vapi/desktop-agnostic-vfs.deps
+%{_datadir}/vala/vapi/desktop-agnostic-vfs.vapi
 
 %files -n python-desktop-agnostic
 %defattr(644,root,root,755)
@@ -182,3 +239,11 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{py_sitedir}/desktopagnostic/ui.so
 %attr(755,root,root) %{py_sitedir}/desktopagnostic/vfs.so
 %{py_sitedir}/desktopagnostic/*.py[co]
+
+%files -n python-desktop-agnostic-devel
+%defattr(644,root,root,755)
+%{_datadir}/pygtk/2.0/defs/desktopagnostic.defs
+%{_datadir}/pygtk/2.0/defs/desktopagnostic_config.defs
+%{_datadir}/pygtk/2.0/defs/desktopagnostic_fdo.defs
+%{_datadir}/pygtk/2.0/defs/desktopagnostic_ui.defs
+%{_datadir}/pygtk/2.0/defs/desktopagnostic_vfs.defs

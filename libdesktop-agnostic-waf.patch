@@ -1,5 +1,5 @@
---- libdesktop-agnostic-0.3.92/data/wscript.orig	2024-12-23 11:22:38.613314242 +0100
-+++ libdesktop-agnostic-0.3.92/data/wscript	2024-12-23 11:22:38.613314242 +0100
+--- libdesktop-agnostic-0.3.92/data/wscript.orig	2024-12-28 14:28:49.649117342 +0100
++++ libdesktop-agnostic-0.3.92/data/wscript	2024-12-28 14:33:08.537714822 +0100
 @@ -1,12 +1,10 @@
  #!/usr/bin/env python
  # encoding: utf-8
@@ -15,7 +15,7 @@
      opt.add_option('--with-glade', action='store_true',
                     dest='glade', default=False,
                     help='Installs the Glade catalog for the ' \
-@@ -17,14 +15,13 @@ def configure(conf):
+@@ -17,35 +15,32 @@ def configure(conf):
      conf.env['GLADE_SUPPORT'] = Options.options.glade
      if conf.env['GLADE_SUPPORT']:
          conf.check_cfg(package='gladeui-2.0', uselib_store='GLADEUI',
@@ -33,24 +33,30 @@
 +    pc = bld(features='subst')
      pc.source = 'desktop-agnostic.pc.in'
      pc.target = 'desktop-agnostic.pc'
-     pc.dict = {
-@@ -34,10 +31,9 @@ def build(bld):
+-    pc.dict = {
++    pc.__dict__.update({
+         'API_VERSION': bld.env['API_VERSION'],
+         'LIBDIR': bld.env['LIBDIR'],
+         'VERSION': bld.env['VERSION'],
          'prefix': bld.env['PREFIX'],
          'datarootdir': bld.env['DATADIR'],
-         }
+-        }
 -    pc.fun = misc.subst_func
++        })
      pc.install_path = '${LIBDIR}/pkgconfig'
  
 -    ini = bld.new_task_gen('subst')
 +    ini = bld(features='subst')
      ini.source = 'desktop-agnostic.ini.in'
      ini.target = 'desktop-agnostic.ini'
-     ini.dict = {
-@@ -45,7 +41,6 @@ def build(bld):
+-    ini.dict = {
++    ini.__dict__.update({
+         'CONFIG_BACKEND': bld.env['BACKENDS_CFG'][0],
          'VFS_BACKEND': bld.env['BACKENDS_VFS'][0],
          'DESKTOP_ENTRY_BACKEND': bld.env['BACKENDS_DE'][0],
-     }
+-    }
 -    ini.fun = misc.subst_func
++    })
      ini.install_path = '${SYSCONFDIR}/xdg/libdesktop-agnostic'
  
      if bld.env['GLADE_SUPPORT']:
@@ -256,7 +262,7 @@
 -    bld.new_task_gen(features='intltool_po', appname='libdesktop-agnostic')
 +    bld(features='intltool_po', appname='libdesktop-agnostic')
 --- libdesktop-agnostic-0.3.92/python/wscript.orig	2011-03-12 15:14:23.000000000 +0100
-+++ libdesktop-agnostic-0.3.92/python/wscript	2024-12-27 16:40:24.123254470 +0100
++++ libdesktop-agnostic-0.3.92/python/wscript	2024-12-28 14:33:31.757589030 +0100
 @@ -4,10 +4,8 @@
  # PyGObject bindings generator (until the gi module is stable)
  # copied/modified from gnome-python-desktop
@@ -331,10 +337,12 @@
 +    init = bld(features='subst')
      init.source = '__init__.py.in'
      init.target = '__init__.py'
-     init.dict = {
+-    init.dict = {
++    init.__dict__.update({
          'VERSION': bld.env['VERSION'],
-     }
+-    }
 -    init.fun = misc.subst_func
++    })
      init.install_path = '${PYTHONDIR}/desktopagnostic'
  
  # vim: set ts=4 sts=4 sw=4 et :
@@ -402,7 +410,7 @@
 +    launcher.includes = '..'
      launcher.target = 'lda-desktop-entry-editor'
 --- libdesktop-agnostic-0.3.92/wscript.orig	2011-03-13 16:09:47.000000000 +0100
-+++ libdesktop-agnostic-0.3.92/wscript	2024-12-23 11:22:38.616647557 +0100
++++ libdesktop-agnostic-0.3.92/wscript	2024-12-28 14:39:39.595596280 +0100
 @@ -1,16 +1,12 @@
  #! /usr/bin/env python
  # encoding: utf-8
@@ -478,7 +486,16 @@
  
      conf.define('API_VERSION', str(API_VERSION))
      conf.define('VERSION', str(VERSION))
-@@ -189,12 +186,12 @@ version %d.%d.%d''' % ((str(conf.env['VA
+@@ -169,6 +166,8 @@ version %d.%d.%d''' % ((str(conf.env['VA
+     conf.define('PACKAGE', APPNAME)
+     conf.define('LIBDIR', conf.env['LIBDIR'])
+     conf.define('SYSCONFDIR', conf.env['SYSCONFDIR'])
++    conf.env['VERSION'] = str(VERSION)
++    conf.env['API_VERSION'] = str(API_VERSION)
+ 
+     if conf.env['DEBUG']:
+         conf.env.append_value('VALAFLAGS', '-g')
+@@ -189,12 +188,12 @@ version %d.%d.%d''' % ((str(conf.env['VA
  
  def build(bld):
      # process subfolders from here
@@ -494,7 +511,7 @@
      old = cls.run
  
      def run(self):
-@@ -207,7 +204,7 @@ def build(bld):
+@@ -207,7 +206,7 @@ def build(bld):
              d = bld.path.abspath()
              latest_input = 0
              for x in self.inputs:
@@ -503,7 +520,7 @@
                  if timestamp > latest_input:
                      latest_input = timestamp
              # we need two passes to check that we have up-to-date C sources
-@@ -224,7 +221,7 @@ def build(bld):
+@@ -224,7 +223,7 @@ def build(bld):
              for x in self.outputs:
                  subdir = x.parent.path_to_parent(x.__class__.bld.srcnode)
                  src = os.path.join(d, GEN_SRC_DIR, subdir, x.name)
@@ -512,3 +529,13 @@
              return 0
      cls.run = run
  
+--- libdesktop-agnostic-0.3.92/data/desktop-agnostic.pc.in.orig	2024-12-28 13:49:12.675327848 +0100
++++ libdesktop-agnostic-0.3.92/data/desktop-agnostic.pc.in	2024-12-28 13:49:15.345313384 +0100
+@@ -1,6 +1,6 @@
+ prefix=@prefix@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/lib
++libdir=@LIBDIR@
+ includedir=${prefix}/include
+ defsdir=@datarootdir@/pygtk/2.0/defs
+ vapidir=@datarootdir@/vala/vapi
