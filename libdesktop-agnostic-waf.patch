@@ -409,8 +409,8 @@
      launcher.vapi_dirs = '../libdesktop-agnostic ../vapi'
 +    launcher.includes = '..'
      launcher.target = 'lda-desktop-entry-editor'
---- libdesktop-agnostic-0.3.92/wscript.orig	2011-03-13 16:09:47.000000000 +0100
-+++ libdesktop-agnostic-0.3.92/wscript	2024-12-28 14:39:39.595596280 +0100
+--- libdesktop-agnostic-0.3.94/wscript.orig	2024-12-28 16:45:52.837901852 +0100
++++ libdesktop-agnostic-0.3.94/wscript	2024-12-28 16:52:55.895609954 +0100
 @@ -1,16 +1,12 @@
  #! /usr/bin/env python
  # encoding: utf-8
@@ -453,18 +453,20 @@
  
      if len(Options.options.config_backends) == 0:
          conf.fatal('At least one configuration backend needs to be built.')
-@@ -93,8 +89,8 @@ def configure(conf):
+@@ -93,9 +89,9 @@ def configure(conf):
      conf.env['INTROSPECTION'] = not Options.options.no_gi
      conf.env['VNUM'] = str(VNUM)
  
 -    conf.check_tool('gnu_dirs')
--    conf.check_tool('compiler_cc intltool misc python vala')
+-    conf.check_tool('compiler_cc misc python vala')
+-    try: conf.check_tool('intltool')
 +    conf.load('gnu_dirs')
-+    conf.load('compiler_c intltool python vala')
++    conf.load('compiler_c python vala')
++    try: conf.load('intltool')
+     except: pass
  
-     MIN_VALA_VERSION = (0, 10, 0)
- 
-@@ -152,16 +148,17 @@ version %d.%d.%d''' % ((str(conf.env['VA
+     MIN_VALA_VERSION = (0, 16, 0)
+@@ -145,16 +141,17 @@ version %d.%d.%d''' % ((str(conf.env['VA
      # check for gobject-introspection
      conf.check_cfg(package='gobject-introspection-1.0',
                     atleast_version='0.6.3', mandatory=True,
@@ -486,7 +488,7 @@
  
      conf.define('API_VERSION', str(API_VERSION))
      conf.define('VERSION', str(VERSION))
-@@ -169,6 +166,8 @@ version %d.%d.%d''' % ((str(conf.env['VA
+@@ -162,6 +159,8 @@ version %d.%d.%d''' % ((str(conf.env['VA
      conf.define('PACKAGE', APPNAME)
      conf.define('LIBDIR', conf.env['LIBDIR'])
      conf.define('SYSCONFDIR', conf.env['SYSCONFDIR'])
@@ -495,7 +497,7 @@
  
      if conf.env['DEBUG']:
          conf.env.append_value('VALAFLAGS', '-g')
-@@ -189,12 +188,12 @@ version %d.%d.%d''' % ((str(conf.env['VA
+@@ -182,12 +181,12 @@ version %d.%d.%d''' % ((str(conf.env['VA
  
  def build(bld):
      # process subfolders from here
@@ -511,7 +513,7 @@
      old = cls.run
  
      def run(self):
-@@ -207,7 +206,7 @@ def build(bld):
+@@ -200,7 +199,7 @@ def build(bld):
              d = bld.path.abspath()
              latest_input = 0
              for x in self.inputs:
@@ -520,7 +522,7 @@
                  if timestamp > latest_input:
                      latest_input = timestamp
              # we need two passes to check that we have up-to-date C sources
-@@ -224,7 +223,7 @@ def build(bld):
+@@ -217,7 +216,7 @@ def build(bld):
              for x in self.outputs:
                  subdir = x.parent.path_to_parent(x.__class__.bld.srcnode)
                  src = os.path.join(d, GEN_SRC_DIR, subdir, x.name)

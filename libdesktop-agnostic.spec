@@ -1,26 +1,27 @@
 #
 # Conditional build:
-%bcond_with	gnome		# GNOME 2.x desktop entry and vfs backends
+%bcond_with	gnome		# GNOME 2.x desktop entry backend
 
 Summary:	Provides an extensible configuration API
 Summary(pl.UTF-8):	Rozszerzalne API konfiguracyjne
 Name:		libdesktop-agnostic
-Version:	0.3.92
-Release:	7
+Version:	0.3.94
+Release:	1
 License:	GPL v2+ and LGPL v2+
 Group:		Libraries
-Source0:	https://launchpad.net/libdesktop-agnostic/0.4/%{version}/+download/%{name}-%{version}.tar.gz
-# Source0-md5:	42374d226a21d57637f97173f6b105a1
-Patch0:		gladeui.patch
-Patch1:		%{name}-waf.patch
-Patch2:		%{name}-vala.patch
-URL:		https://launchpad.net/libdesktop-agnostic
+#Source0Download: https://github.com/p12tic/libdesktop-agnostic/tags
+Source0:	https://github.com/p12tic/libdesktop-agnostic/archive/v%{version}/%{name}-%{version}.tar.gz
+# Source0-md5:	86df79f457fea3f9a55d0d653ab89317
+Patch0:		%{name}-git.patch
+Patch1:		gladeui.patch
+Patch2:		%{name}-waf.patch
+Patch3:		%{name}-vala.patch
+URL:		https://github.com/p12tic/libdesktop-agnostic
 BuildRequires:	GConf2-devel >= 2.0
 BuildRequires:	gettext-tools
 BuildRequires:	glade-devel >= 3
 BuildRequires:	glib2-devel >= 1:2.18.0
 %{?with_gnome:BuildRequires:	gnome-desktop2-devel >= 2.0}
-%{?with_gnome:BuildRequires:	gnome-vfs2-devel >= 2.6.0}
 BuildRequires:	gobject-introspection-devel >= 0.6.3
 BuildRequires:	gtk+2-devel >= 2:2.12.0
 BuildRequires:	intltool
@@ -127,14 +128,14 @@ libdesktop-agnostic.
 
 %prep
 %setup -q
-# Use gladeui-2.0, not glade-1.0
 %patch -P0 -p1
+# Use gladeui-2.0, not glade-1.0
 %patch -P1 -p1
 %patch -P2 -p1
+%patch -P3 -p1
 
 %build
 export CFLAGS="%{rpmcflags}"
-export LINKFLAGS="%{rpmldflags} -fcommon"
 export WAFDIR=/usr/share/waf3
 PYTHONDIR=%{py_sitedir} \
 %{__python} /usr/bin/waf configure \
@@ -142,9 +143,9 @@ PYTHONDIR=%{py_sitedir} \
 	  --libdir=%{_libdir} \
 	  --sysconfdir=%{_sysconfdir} \
 	  --enable-debug \
-	  --config-backends=gconf \
-	  --desktop-entry-backends=glib%{?with_gnome:,gnome} \
-	  --vfs-backends=gio%{?with_gnome:,gnome} \
+	  --config-backends=gconf,keyfile \
+	  --desktop-entry-backends=glib,gio%{?with_gnome:,gnome} \
+	  --vfs-backends=gio \
 	  --with-glade
 
 %{__python} /usr/bin/waf -v build
@@ -193,8 +194,13 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_libdir}/desktop-agnostic
 %dir %{_libdir}/desktop-agnostic/modules
 %attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-cfg-gconf.so
+%attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-cfg-keyfile.so
 %attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-cfg-type-color.so
+%attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-fdo-gio.so
 %attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-fdo-glib.so
+%if %{with gnome}
+%attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-fdo-gnome.so
+%endif
 %attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-module-guesser.so
 %attr(755,root,root) %{_libdir}/desktop-agnostic/modules/libda-vfs-gio.so
 

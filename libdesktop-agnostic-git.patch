@@ -1,0 +1,952 @@
+commit 226501370eb1c68d7c39a8c12e49dd22d2f7b4f2
+Author: kozec <kozec@kozec.com>
+Date:   Mon May 4 18:46:15 2015 +0200
+
+    Fixed build error caused by changes in Vala. Fixes p12tic/libdesktop-agnostic#4
+
+diff --git a/libdesktop-agnostic/ui-icon-chooser-dialog.vala b/libdesktop-agnostic/ui-icon-chooser-dialog.vala
+index a54d2a3..5647792 100644
+--- a/libdesktop-agnostic/ui-icon-chooser-dialog.vala
++++ b/libdesktop-agnostic/ui-icon-chooser-dialog.vala
+@@ -165,7 +165,7 @@ namespace DesktopAgnostic.UI
+       {
+         TreeIter iter;
+         Value val;
+-        var store = this._viewer.model as ListStore;
++        var store = this._viewer.model as Gtk.ListStore;
+         store.get_iter (out iter, p);
+         store.get_value (iter, Column.DATA, out val);
+ 
+@@ -205,11 +205,11 @@ namespace DesktopAgnostic.UI
+       return viewer;
+     }
+ 
+-    private ListStore
++    private Gtk.ListStore
+     create_model ()
+     {
+       // icon, name, data
+-      return new ListStore (Column.COUNT,
++      return new Gtk.ListStore (Column.COUNT,
+                             typeof (Gdk.Pixbuf),
+                             typeof (string),
+                             typeof (string),
+@@ -291,12 +291,12 @@ namespace DesktopAgnostic.UI
+     private void
+     on_folder_changed (FileChooser chooser)
+     {
+-      unowned ListStore model;
++      unowned Gtk.ListStore model;
+       string uri;
+       VFS.File directory;
+       SList<VFS.File> children;
+ 
+-      model = this._file_viewer.model as ListStore;
++      model = this._file_viewer.model as Gtk.ListStore;
+       model.clear ();
+ 
+       uri = chooser.get_uri ();
+@@ -342,11 +342,11 @@ namespace DesktopAgnostic.UI
+     private void
+     on_icon_context_changed (ComboBox box)
+     {
+-      unowned ListStore model;
++      unowned Gtk.ListStore model;
+       unowned IconTheme icon_theme;
+       List<string> icon_list;
+ 
+-      model = this._themed_viewer.model as ListStore;
++      model = this._themed_viewer.model as Gtk.ListStore;
+       model.clear ();
+ 
+       icon_theme = IconTheme.get_default ();
+
+commit 83a5ab15dc8889a280a83ae2609d1e0d80676bab
+Merge: 8772247 2265013
+Author: Povilas Kanapickas <povilas@radix.lt>
+Date:   Tue May 5 12:18:53 2015 +0300
+
+    Merge pull request #5 from kozec/master
+    
+    Fixed build error caused by changes in Vala. Fixes #4
+
+commit 9e38f0c9a10cff8e2f67e4a1e333c8d3e03998a0
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Thu Oct 8 01:54:24 2015 -0400
+
+    Fix assertion failures.
+    
+    CRITICAL **: desktop_agnostic_config_schema_get_metadata_option: assertion 'self != NULL' failed
+    CRITICAL **: desktop_agnostic_config_new_for_instance: assertion 'schema != NULL' failed
+
+diff --git a/libdesktop-agnostic/config-client.vala b/libdesktop-agnostic/config-client.vala
+index 51d55de..81b84be 100644
+--- a/libdesktop-agnostic/config-client.vala
++++ b/libdesktop-agnostic/config-client.vala
+@@ -73,7 +73,7 @@ namespace DesktopAgnostic.Config
+       }
+       construct
+       {
+-        if (value != null && !this.create_instance_config (value))
++        if (value != null &&  this._schema != null && !this.create_instance_config (value))
+         {
+           warning ("The configuration schema has declared that there can only be a single configuration instance.");
+           warning ("Not creating an instance config object.");
+@@ -133,6 +133,11 @@ namespace DesktopAgnostic.Config
+     private bool
+     create_instance_config (string instance_id) throws GLib.Error
+     {
++      if (this._schema == null)
++      {
++        return false;
++      }
++
+       Value? single_instance = this._schema.get_metadata_option ("single_instance");
+       if ((single_instance != null) && (single_instance.get_boolean()) )
+       {
+
+commit 554c1bd807661c6c240d3ec87c0cf4ae9a27ec24
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Thu Oct 8 02:13:30 2015 -0400
+
+    Fix memory corruption/segmentation fault when failing to load a file.
+    
+    _file.load-contents throws an exception which went uncaught. All output
+    values were invalid which caused more issues. Catch the exception so the
+    return values and output parameters are sane. The code does not throw any
+    exceptions so don't declare Throw.
+    .
+    Also don't hardcode 0 and explicitly use FileCreateFlags.NONE.
+
+diff --git a/libdesktop-agnostic/vfs-file-impl-gio.vala b/libdesktop-agnostic/vfs-file-impl-gio.vala
+index dc4f031..85f5d32 100644
+--- a/libdesktop-agnostic/vfs-file-impl-gio.vala
++++ b/libdesktop-agnostic/vfs-file-impl-gio.vala
+@@ -175,25 +175,30 @@ namespace DesktopAgnostic.VFS
+       return new FileMonitorGIO (this);
+     }
+     public override bool
+-    load_contents (out string contents, out size_t length) throws Error
++    load_contents (out string contents, out size_t length)
+     {
+-      uint8 [] glib_contents;
+-      if (this._file.load_contents (null, out glib_contents, null))
++      try
+       {
++        uint8 [] glib_contents;
++        this._file.load_contents (null, out glib_contents, null);
+         contents = (string)(owned)glib_contents;
+         length = contents.length;
+         return true;
+       }
+-      else
++      catch (GLib.Error e)
+       {
++        warning ("Failed to load the file '%s': %s Code:%d",
++                  this._file.get_parse_name (), e.message, e.code);
++        contents = "";
++        length = 0;
+         return false;
+       }
+     }
+     public override bool
+     replace_contents (string contents) throws Error
+     {
+-      return this._file.replace_contents (contents.data, null,
+-                                          false, 0, null, null);
++      return this._file.replace_contents (contents.data, null, false,
++                                          FileCreateFlags.NONE, null, null);
+     }
+     public override bool
+     launch () throws Error
+
+commit 62a2045b0e6ea31de8732eef9d6f40b95cef4899
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Fri Oct 9 04:11:12 2015 -0400
+
+    Fix some warnings.
+
+diff --git a/libdesktop-agnostic/config-impl-gconf.vala b/libdesktop-agnostic/config-impl-gconf.vala
+index 6f8226f..bfed8e3 100644
+--- a/libdesktop-agnostic/config-impl-gconf.vala
++++ b/libdesktop-agnostic/config-impl-gconf.vala
+@@ -256,7 +256,7 @@ namespace DesktopAgnostic.Config
+       {
+         vt = GConf.ValueType.LIST;
+       }
+-      else if (this.schema.find_type (type) != null)
++      else if (Schema.find_type (type) != null)
+       {
+         vt = GConf.ValueType.STRING;
+       }
+@@ -310,7 +310,7 @@ namespace DesktopAgnostic.Config
+       }
+       else
+       {
+-        SchemaType st = this.schema.find_type (type);
++        SchemaType st = Schema.find_type (type);
+         if (st == null)
+         {
+           throw new Error.INVALID_TYPE ("Invalid config value type.");
+@@ -349,7 +349,7 @@ namespace DesktopAgnostic.Config
+         }
+         else
+         {
+-          SchemaType st = this.schema.find_type (type);
++          SchemaType st = Schema.find_type (type);
+           if (st == null)
+           {
+             throw new Error.INVALID_TYPE ("Invalid config value type: %s.",
+diff --git a/libdesktop-agnostic/config.vala b/libdesktop-agnostic/config.vala
+index 232b536..805c644 100644
+--- a/libdesktop-agnostic/config.vala
++++ b/libdesktop-agnostic/config.vala
+@@ -168,7 +168,7 @@ namespace DesktopAgnostic.Config
+       }
+       else
+       {
+-        SchemaType st = schema.find_type (option_type);
++        SchemaType st = Schema.find_type (option_type);
+         if (st == null)
+         {
+           throw new Error.INVALID_TYPE ("Invalid config value type.");
+diff --git a/libdesktop-agnostic/ui-icon-chooser-dialog.vala b/libdesktop-agnostic/ui-icon-chooser-dialog.vala
+index 5647792..e3c04be 100644
+--- a/libdesktop-agnostic/ui-icon-chooser-dialog.vala
++++ b/libdesktop-agnostic/ui-icon-chooser-dialog.vala
+@@ -98,7 +98,7 @@ namespace DesktopAgnostic.UI
+     {
+       this.response.connect (this.on_response);
+       this.title = _ ("Select Icon");
+-      this.icon_name = STOCK_FIND;
++      this.icon_name = Gtk.Stock.FIND;
+       this.set_default_size (375, 375);
+       this.create_ui ();
+     }
+@@ -121,8 +121,8 @@ namespace DesktopAgnostic.UI
+ 
+       this.on_icon_type_toggled ();
+ 
+-      this.add_buttons (STOCK_CANCEL, ResponseType.CANCEL,
+-                        STOCK_OK, ResponseType.OK);
++      this.add_buttons (Gtk.Stock.CANCEL, ResponseType.CANCEL,
++                        Gtk.Stock.OK, ResponseType.OK);
+     }
+ 
+     private void
+diff --git a/libdesktop-agnostic/ui-launcher-editor-dialog.vala b/libdesktop-agnostic/ui-launcher-editor-dialog.vala
+index 1eca1ef..80d3309 100644
+--- a/libdesktop-agnostic/ui-launcher-editor-dialog.vala
++++ b/libdesktop-agnostic/ui-launcher-editor-dialog.vala
+@@ -113,8 +113,8 @@ namespace DesktopAgnostic.UI
+       bool is_application = true;
+ 
+       // Action bar
+-      this.add_buttons (STOCK_CANCEL, ResponseType.CANCEL,
+-                        STOCK_SAVE, ResponseType.APPLY);
++      this.add_buttons (Gtk.Stock.CANCEL, ResponseType.CANCEL,
++                        Gtk.Stock.SAVE, ResponseType.APPLY);
+       this.set_default_response (ResponseType.CANCEL);
+       this.response.connect (this.on_response);
+ 
+@@ -133,7 +133,7 @@ namespace DesktopAgnostic.UI
+       }
+       else
+       {
+-        icon = STOCK_MISSING_IMAGE;
++        icon = Gtk.Stock.MISSING_IMAGE;
+       }
+       this._icon = new IconButton (icon);
+       this._icon.icon_selected.connect (this.on_icon_changed);
+@@ -219,7 +219,7 @@ namespace DesktopAgnostic.UI
+       this._exec.changed.connect (this.on_exec_changed);
+       exec_hbox.pack_start (this._exec, true);
+       exec_button = new Button.with_mnemonic (_ ("_Browse..."));
+-      exec_image = new Image.from_stock (STOCK_OPEN, IconSize.BUTTON);
++      exec_image = new Image.from_stock (Gtk.Stock.OPEN, IconSize.BUTTON);
+       exec_button.set_image (exec_image);
+       exec_button.clicked.connect (this.on_exec_browse);
+       exec_hbox.pack_start (exec_button, false);
+@@ -325,8 +325,8 @@ namespace DesktopAgnostic.UI
+ 
+       dialog = new FileChooserDialog (title, this,
+                                       FileChooserAction.OPEN,
+-                                      STOCK_CANCEL, ResponseType.CANCEL,
+-                                      STOCK_OK, ResponseType.OK);
++                                      Gtk.Stock.CANCEL, ResponseType.CANCEL,
++                                      Gtk.Stock.OK, ResponseType.OK);
+       response = dialog.run ();
+       if (response == ResponseType.OK)
+       {
+@@ -359,8 +359,8 @@ namespace DesktopAgnostic.UI
+ 
+       dialog = new FileChooserDialog (_ ("Save As"), this,
+                                       FileChooserAction.SAVE,
+-                                      STOCK_CANCEL, ResponseType.CANCEL,
+-                                      STOCK_SAVE_AS, ResponseType.ACCEPT);
++                                      Gtk.Stock.CANCEL, ResponseType.CANCEL,
++                                      Gtk.Stock.SAVE_AS, ResponseType.ACCEPT);
+       response = dialog.run ();
+       if (response == ResponseType.ACCEPT)
+       {
+
+commit 650c74f8c02732563c845af3887069755f8585c6
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Fri Oct 9 13:48:00 2015 -0400
+
+    Sphinx fails to correctly install the documentation w/o this folder.
+    
+    Use an empty .gitignore file to allow git to include the empty folder.
+
+diff --git a/docs/_static/.gitignore b/docs/_static/.gitignore
+new file mode 100644
+index 0000000..e69de29
+
+commit 2e728c01b3ff3e780a2572a226ea3347cb01808e
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Fri Oct 9 17:14:02 2015 -0400
+
+    Fix FileMonitorGIO so it does what it claims it did.
+    
+    Monitoring directories was broken since it was always returning null as the
+    child that sent the signal. FileMonitoring was not complying with the
+    libagnostic API since it was sending signals of temporary files due to
+    atomic I/O.
+    .
+    To show my point here is what Glib.FileMonitor actually reports:
+    Directory Monitor -> Creation:
+        Directory Monitor Event:
+        Child = /test/file
+        Event = CREATED
+        Directory Monitor Event:
+        Child = /test/file
+        Event = CHANGES_DONE_HINT
+        Directory Monitor Event:
+        Child = /test/file
+        Event = ATTRIB CHANGED
+    Directory Monitor -> Modification:
+        Directory Monitor Event:
+        Child = /test/.goutputstream-YYCD6X
+        Event = CREATED
+        Directory Monitor Event:
+        Child = /test/.goutputstream-YYCD6X
+        Event = CHANGES_DONE_HINT
+        Directory Monitor Event:
+        Child = /test/.goutputstream-YYCD6X
+        Event = ATTRIB CHANGED
+        Directory Monitor Event:
+        Child = /test/.goutputstream-YYCD6X
+        Event = CHANGED
+        Directory Monitor Event:
+        Child = /test/.goutputstream-YYCD6X
+        Event = CHANGES_DONE_HINT
+        Directory Monitor Event:
+        Child = /test/.goutputstream-YYCD6X
+        Event = DELETED
+        Directory Monitor Event:
+        Child = /test/file
+        Event = CREATED
+        Directory Monitor Event:
+        Child = /test/file
+        Event = CHANGES_DONE_HINT
+    Directory Monitor -> Deletion:
+        Directory Monitor Event:
+        Child = /test/file
+        Event = DELETED
+    File Monitor -> Creation:
+        File Monitor Event:
+        File = /test/file
+        Event = CREATED
+        File Monitor Event:
+        File = /test/file
+        Event = CHANGED
+        File Monitor Event:
+        File = /test/file
+        Event = CHANGES_DONE_HINT
+    File Monitor -> Modification:
+        File Monitor Event:
+        File = /test/.goutputstream-EJRJ6X
+        Event = DELETED
+        File Monitor Event:
+        File = /test/file
+        Event = CREATED
+        File Monitor Event:
+        File = /test/file
+        Event = CHANGES_DONE_HINT
+    File Monitor -> Deletion:
+        File Monitor Event:
+        File = /test/file
+        Event = DELETED
+
+diff --git a/libdesktop-agnostic/vfs-file-monitor-impl-gio.vala b/libdesktop-agnostic/vfs-file-monitor-impl-gio.vala
+index 2b248a2..9620116 100644
+--- a/libdesktop-agnostic/vfs-file-monitor-impl-gio.vala
++++ b/libdesktop-agnostic/vfs-file-monitor-impl-gio.vala
+@@ -47,19 +47,43 @@ namespace DesktopAgnostic.VFS
+       }
+       this.monitor.changed.connect(this.monitor_callback);
+     }
++
++    /**
++     * @param monitor is a monitor initialized with FileMonitorFlags.NONE.
++     * @param file contains the file that sent the signal and is not guaranteed
++     *             to be equal to the file associated with the monitor.
++     * @param other is always null when using FileMonitorFlags.NONE.
++     * @param event_type is the changed signal sent by file.
++     */
+     private void monitor_callback (GLib.FileMonitor monitor, GLib.File file,
+                                    GLib.File? other,
+                                    GLib.FileMonitorEvent event_type)
+     {
+       File other_file = null;
+-      if (other != null)
++
++      // Return other_file=file if it's a directory and null otherwise.
++      // It makes more sense to always use file but this is done to actually
++      // comply with the current API.
++      if (this.file.file_type == FileType.DIRECTORY)
++      {
++        other_file = file_new_for_uri (file.get_uri ());
++      }
++      else
+       {
+-        other_file = file_new_for_uri (other.get_uri ());
++        // The current API says that if the URI associated with the monitor is a
++        // file then to only report signals if file = this.file. They are not
++        // always equal.
++        GLib.File impl = (GLib.File)this.file.implementation;
++        if(!impl.equal(file))
++        {
++          return;
++        }
+       }
++
+       FileMonitorEvent da_event;
+       switch (event_type)
+       {
+-        case GLib.FileMonitorEvent.CHANGED:
++        // Don't catch multiple transitional CHANGES just the "last" one.
+         case GLib.FileMonitorEvent.CHANGES_DONE_HINT:
+           da_event = FileMonitorEvent.CHANGED;
+           break;
+
+commit 0fa6165b794fe71f1a73f150cfbd9453a0b6e2b8
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Thu Oct 8 04:38:44 2015 -0400
+
+    Fix the keyfile configuration backend.
+    
+    Gconf is deprecated and the keyfile backend is broken. Fix several infinite
+    loops and segmentation faults found while testing. Some code was rewritten
+    to minimize the File I/O operations. Each applet generates a FileMonitor for
+    avant-window-navigator.ini and a single change there will trigger a cascade of
+    checks which currently resulted in a ton of I/O operations and in the worst case
+    infinite loops.
+
+diff --git a/libdesktop-agnostic/config-impl-keyfile.vala b/libdesktop-agnostic/config-impl-keyfile.vala
+index 26e8979..1a64984 100644
+--- a/libdesktop-agnostic/config-impl-keyfile.vala
++++ b/libdesktop-agnostic/config-impl-keyfile.vala
+@@ -57,14 +57,15 @@ namespace DesktopAgnostic.Config
+      * suppressing the "changed" signal from the file monitor.
+      */
+     private void
+-    save_config () throws GLib.Error
++    save_config (bool calc_chksum = true) throws GLib.Error
+     {
+       string data;
+-      size_t length;
++      data = this._data.to_data (null);
++      if (calc_chksum)
++      {
++        this._checksum = calculate_checksum_from_data (data);
++      }
+ 
+-      data = this._data.to_data (out length);
+-      this._checksum = Checksum.compute_for_string (ChecksumType.SHA256,
+-                                                    data, length);
+       if (this._monitor_changed_id != 0)
+       {
+         // block changed signal
+@@ -79,6 +80,20 @@ namespace DesktopAgnostic.Config
+       }
+     }
+ 
++    private string
++    calculate_checksum_from_data (string data)
++    {
++      return Checksum.compute_for_string (ChecksumType.SHA256, data, data.length);
++    }
++
++    private void
++    calculate_checksum ()
++    {
++      string data;
++      data = this._data.to_data (null);
++      this._checksum = calculate_checksum_from_data (data);
++    }
++
+     /**
+      * Saves the current configuration state to the filesystem (if autosave is
+      * on) and emits the notify signal.
+@@ -94,22 +109,35 @@ namespace DesktopAgnostic.Config
+     }
+ 
+     private void
+-    get_data_from_file (VFS.File file, out string contents, out size_t length,
+-                        out string checksum) throws GLib.Error
++    load_data (VFS.File file)
+     {
+-      file.load_contents (out contents, out length);
+-      checksum = Checksum.compute_for_string (ChecksumType.SHA256,
+-                                              contents, length);
+-    }
+-
+-    private void
+-    load_data (VFS.File file) throws GLib.Error
+-    {
+-      string data;
+-      size_t length;
++      try
++      {
++        string data;
++        size_t length;
+ 
+-      this.get_data_from_file (file, out data, out length, out this._checksum);
+-      this._data.load_from_data (data, (ulong)length, KeyFileFlags.NONE);
++        // Load the keyfile and update _data. If the keyfile can't be loaded
++        // then regenerate it based on the current configuration.
++        if(file.load_contents (out data, out length))
++        {
++          this.update_from_keyfile(data);
++        }
++        else
++        {
++          this.save_config ();
++        }
++      }
++      catch (KeyFileError.PARSE e)
++      {
++        // Keyfile is invalid. Recover by overwriting the keyfile with the
++        // current configuration.
++        warning ("File is invalid: %s", e.message);
++        this.save_config ();
++      }
++      catch (GLib.Error e)
++      {
++        critical ("Failed to load the keyfile: %s Code:%d", e.message, e.code);
++      }
+     }
+ 
+     private void
+@@ -119,29 +147,74 @@ namespace DesktopAgnostic.Config
+       Type type = option.option_type;
+       if (type == typeof (bool))
+       {
+-        this.set_bool (group, key, keyfile.get_boolean (group, key));
++        bool val;
++        try
++        {
++          val = keyfile.get_boolean (group, key);
++        }
++        catch (KeyFileError e)
++        {
++          return;
++        }
++        this._data.set_boolean (group, key, val);
++        this.update_config (group, key);
+       }
+       else if (type == typeof (int))
+       {
+-        this.set_int (group, key, keyfile.get_integer (group, key));
++        int val;
++        try
++        {
++          val = keyfile.get_integer (group, key);
++        }
++        catch (KeyFileError e)
++        {
++          return;
++        }
++        this._data.set_integer (group, key, val);
++        this.update_config (group, key);
+       }
+       else if (type == typeof (float))
+       {
+-        this.set_float (group, key, (float)keyfile.get_double (group, key));
++        float val;
++        try
++        {
++          val = (float)keyfile.get_double (group, key);
++        }
++        catch (KeyFileError e)
++        {
++          return;
++        }
++        this._data.set_double (group, key, val);
++        this.update_config (group, key);
+       }
+       else if (type == typeof (string))
+       {
+-        this.set_string (group, key, keyfile.get_string (group, key));
++        string val;
++        try
++        {
++          val = keyfile.get_string (group, key);
++        }
++        catch (KeyFileError e)
++        {
++          return;
++        }
++        this._data.set_string (group, key, val);
++        this.update_config (group, key);
+       }
+       else if (type == typeof (ValueArray))
+       {
+         ValueArray arr;
+-
+-        arr = this.generate_valuearray_from_keyfile (keyfile, group, key);
+-
++        try
++        {
++          arr = this.generate_valuearray_from_keyfile (keyfile, group, key);
++        }
++        catch (KeyFileError e)
++        {
++          return;
++        }
+         this.set_list (group, key, arr);
+       }
+-      else
++      else // Treat it as a string.
+       {
+         SchemaType? st = Schema.find_type (type);
+         if (st == null)
+@@ -150,10 +223,65 @@ namespace DesktopAgnostic.Config
+                                         type.name ());
+         }
+ 
+-        Value val;
++        string val;
++        try
++        {
++          val = keyfile.get_string (group, key);
++        }
++        catch (KeyFileError e)
++        {
++          return;
++        }
++        this._data.set_string (group, key, val);
++        this.update_config (group, key);
++      }
++    }
++
++    private void
++    update_from_keyfile (string data) throws GLib.Error
++    {
++      string checksum = calculate_checksum_from_data (data);
++
++      if (this._checksum != checksum)
++      {
++        unowned Schema? schema = this.schema;
++        if (schema == null)
++        {
++          throw new Error.NO_SCHEMA ("The schema was not loaded.");
++        }
++
++        KeyFile new_data = new KeyFile ();
++        new_data.load_from_data (data, data.length, KeyFileFlags.NONE);
+ 
+-        val = st.deserialize (keyfile.get_string (group, key));
+-        this.set_value (group, key, val);
++        this._autosave = false;
++        foreach (unowned string group in schema.get_groups ())
++        {
++          if(this._data.has_group (group) && new_data.has_group (group))
++          {
++            foreach (unowned string key in schema.get_keys (group))
++            {
++              // Only add if there is a new key/value pair.
++              if (new_data.has_key (group, key))
++              {
++                // If it's a ValueArray defer checking if it's updated to set_list().
++                if (schema.get_option (group, key).option_type == typeof (ValueArray) ||
++                    (this._data.has_key (group, key) &&
++                     this._data.get_value (group, key) != new_data.get_value (group, key)))
++                {
++                  this.set_value_from_keyfile (new_data, group, key);
++                }
++              }
++            }
++          }
++        }
++        this._autosave = true;
++
++        calculate_checksum ();
++        if (this._checksum != checksum)
++        {
++          // Only save if they are still different after the update.
++          this.save_config(false);
++        }
+       }
+     }
+ 
+@@ -256,48 +384,36 @@ namespace DesktopAgnostic.Config
+     {
+       switch (event)
+       {
+-        case VFS.FileMonitorEvent.CREATED:
+-          // just set the data
++        /**
++         * The keyfile always gets created on startup if there is none.
++         *
++         * - If the user modifies the keyfile this will trigger a DELETED ->
++         *   CREATED -> CHANGED sequence. In this case the keyfile always exists
++         *   so ignore the DELETED/CREATED event and go directly to the CHANGED
++         *   event to update the settings if there were any.
++         *
++         * - If the user deletes the keyfile then only a DELETED event occurs.
++         *   Regenerate it based on the default configuration.
++         */
++        case VFS.FileMonitorEvent.CHANGED:
+           this.load_data (file);
+           break;
+-        case VFS.FileMonitorEvent.CHANGED:
+-          // check to see if the contents have changed
+-          string data;
+-          size_t length;
+-          string checksum;
+-
+-          this.get_data_from_file (file, out data, out length, out checksum);
+-          if (this._checksum != checksum)
++        case VFS.FileMonitorEvent.DELETED:
++          if (!this._keyfile.exists ())
+           {
+-            // iterate through the config keys and determine which ones have changed
+-            unowned Schema schema = this.schema;
+-            KeyFile new_data = new KeyFile ();
+-
+-            new_data.load_from_data (data, length, KeyFileFlags.NONE);
+-
+-            this._autosave = false;
+-            foreach (unowned string group in schema.get_groups ())
++            GLib.File impl = (GLib.File)this._keyfile.implementation;
++            this.ensure_directory (Path.get_dirname (impl.get_path()));
++            try
+             {
+-              foreach (unowned string key in schema.get_keys (group))
+-              {
+-                if (this._data.has_group (group))
+-                {
+-                  if ((this._data.has_key (group, key) &&
+-                       this._data.get_value (group, key) != new_data.get_value (group, key)) ||
+-                      schema.get_option (group, key).option_type == typeof (ValueArray))
+-                  {
+-                    this.set_value_from_keyfile (new_data, group, key);
+-                  }
+-                }
+-              }
++              this.reset ();
++            }
++            catch (GLib.Error e)
++            {
++              critical ("Failed to regenerate the default configuration: %s Code:%d",
++                         e.message, e.code);
+             }
+-            this._autosave = true;
+           }
+           break;
+-        case VFS.FileMonitorEvent.DELETED:
+-          // reset & save to disk
+-          this.reset ();
+-          break;
+         default:
+           // do nothing
+           break;
+@@ -351,11 +467,14 @@ namespace DesktopAgnostic.Config
+                                     "%s-%s.ini".printf (schema.app_name,
+                                                         this.instance_id));
+       }
+-      this._keyfile = VFS.file_new_for_path (path);
++
+       try
+       {
++        this._keyfile = VFS.file_new_for_path (path);
+         if (this._keyfile.exists ())
+         {
++          this.reset_nosave();
++          calculate_checksum ();
+           this.load_data (this._keyfile);
+         }
+         else
+@@ -364,9 +483,13 @@ namespace DesktopAgnostic.Config
+           this.reset ();
+         }
+       }
+-      catch (GLib.Error err)
++      catch (GLib.Error e)
+       {
+-        critical ("Config error: %s", err.message);
++        critical ("Configuration error: %s Code:%d", e.message, e.code);
++        // Can't really recover from this. If we can't access the keyfile or
++        // the settings in the schemas during initialization then we are done.
++        // Can't throw from a GLib.Object.constructed.
++        //Process.abort();
+       }
+       // don't immediately create the file monitor, otherwise it will catch
+       // the "config file created" signal.
+@@ -380,8 +503,8 @@ namespace DesktopAgnostic.Config
+                                 this._monitor_changed_id);
+     }
+ 
+-    public override void
+-    reset () throws GLib.Error
++    private void
++    reset_nosave () throws GLib.Error
+     {
+       unowned Schema? schema = this.schema;
+       if (schema == null)
+@@ -402,6 +525,12 @@ namespace DesktopAgnostic.Config
+         }
+       }
+       this._autosave = true;
++    }
++
++    public override void
++    reset () throws GLib.Error
++    {
++      this.reset_nosave ();
+       this.save_config ();
+     }
+ 
+@@ -446,14 +575,13 @@ namespace DesktopAgnostic.Config
+     }
+ 
+     /**
+-     * Removes the config file from the file system. Implies reset(), but does
+-     * not save to disk.
++     * Removes the config file from the file system.
+      */
+     public override void
+     remove () throws GLib.Error
+     {
++      // Let the FileMonitor code regenerate the file.
+       this._keyfile.remove ();
+-      this.reset ();
+     }
+ 
+     public override Value
+@@ -493,7 +621,7 @@ namespace DesktopAgnostic.Config
+       }
+       else
+       {
+-        SchemaType st = this.schema.find_type (option_type);
++        SchemaType st = Schema.find_type (option_type);
+         if (st == null)
+         {
+           throw new Error.INVALID_TYPE ("'%s' is an invalid config type.",
+@@ -540,7 +668,7 @@ namespace DesktopAgnostic.Config
+     }
+ 
+     public override float
+-    get_float (string group, string key) throws Error
++    get_float (string group, string key) throws GLib.Error
+     {
+       try
+       {
+@@ -693,16 +821,23 @@ namespace DesktopAgnostic.Config
+         }
+       }
+ 
+-      if (value.n_values == 0)
++      if (value.n_values == 0 &&
++          (list_type == typeof (bool) || list_type == typeof (int) || list_type == typeof (float)))
+       {
++        warning ("Discarding empty key: %s", key);
+         if (!this._data.has_group (group))
+         {
+-          return;
++          // Create the group since it could be the only element in the group
++          // but discard the key.
++          this._data.set_boolean (group, key, true);
++          this._data.remove_key (group, key);
+         }
+-        if (this._data.has_key (group, key))
++        else
+         {
+-          // set_*_list() doesn't like NULL lists, so just unset the key.
+-          this._data.remove_key (group, key);
++          // set_string_list needs NULL the rest of them don't like NULL lists.
++          // Keep the last valid value since some values can be mandatory.
++          // If the key never existed then discard the key/value pair.
++          return;
+         }
+       }
+       else if (list_type == typeof (bool))
+
+commit 4b31b9d91686c7220b259b42957af5608322a789
+Author: Miguel A. Colón Vélez <debian.micove@gmail.com>
+Date:   Sat Oct 10 00:58:12 2015 -0400
+
+    Bump the required VALA version and make the locales truly optional.
+    
+    - GLib.FileAttribute requires Vala >= 0.16.0
+    - It seems that building the joke locale was supposed to be semi-optional:
+        if bld.env['INTLTOOL']:
+            bld.add_subdirs('po')
+      check_tool will throw a fatal error if not found so catch the error.
+
+diff --git a/wscript b/wscript
+index ca798c2..b4b8f16 100644
+--- a/wscript
++++ b/wscript
+@@ -94,9 +94,11 @@ def configure(conf):
+     conf.env['VNUM'] = str(VNUM)
+ 
+     conf.check_tool('gnu_dirs')
+-    conf.check_tool('compiler_cc intltool misc python vala')
++    conf.check_tool('compiler_cc misc python vala')
++    try: conf.check_tool('intltool')
++    except: pass
+ 
+-    MIN_VALA_VERSION = (0, 10, 0)
++    MIN_VALA_VERSION = (0, 16, 0)
+ 
+     conf.check_cfg(package='gmodule-2.0', uselib_store='GMODULE',
+                    atleast_version='2.6.0', mandatory=True,
+
+commit 4d9b6fd4c6c75b825049fc41d1ab2482a9755450
+Merge: 8772247 4b31b9d
+Author: Povilas Kanapickas <tir5c3@yahoo.co.uk>
+Date:   Sat Oct 17 21:51:59 2015 +0300
+
+    Merge branch master of https://github.com/micove/libdesktop-agnostic-1.git
+
+commit 92d471935cfb954e5d9f0b7f8e5007b605979bc2
+Author: Ryan P.C. McQuen <ryan.q@linux.com>
+Date:   Mon May 2 06:00:12 2016 -0700
+
+    Fix building with vala 0.32.0.
+
+diff --git a/libdesktop-agnostic/config-bridge.vala b/libdesktop-agnostic/config-bridge.vala
+index f0d89bb..84ffedc 100644
+--- a/libdesktop-agnostic/config-bridge.vala
++++ b/libdesktop-agnostic/config-bridge.vala
+@@ -323,7 +323,7 @@ namespace DesktopAgnostic.Config
+       }
+       else
+       {
+-        unowned ParamSpec[] properties;
++        ParamSpec[] properties;
+         string props_str;
+         properties = ((ObjectClass)(obj.get_type ().class_peek ())).list_properties ();
+         props_str = "";
+
+commit be0f0cb99ee292616e0159b3aed918ffbac5d75d
+Merge: 4d9b6fd 92d4719
+Author: Povilas Kanapickas <povilas@radix.lt>
+Date:   Mon May 2 22:23:38 2016 +0300
+
+    Merge pull request #9 from ryanpcmcquen/patch-1
+    
+    Fix building with vala 0.32.0.
